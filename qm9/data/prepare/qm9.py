@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import tarfile
 
 import logging
 import os
@@ -26,14 +27,29 @@ def download_dataset_qm9(datadir, dataname, splits=None, calculate_thermo=True, 
         'Downloading and processing GDB9 dataset. Output will be in directory: {}.'.format(gdb9dir))
 
     logging.info('Beginning download of GDB9 dataset!')
-    gdb9_url_data = 'https://springernature.figshare.com/ndownloader/files/3195389'
-    gdb9_tar_data = join(gdb9dir, 'dsgdb9nsd.xyz.tar.bz2')
-    # gdb9_tar_file = join(gdb9dir, 'dsgdb9nsd.xyz.tar.bz2')
-    # gdb9_tar_data =
-    # tardata = tarfile.open(gdb9_tar_file, 'r')
-    # files = tardata.getmembers()
-    urllib.request.urlretrieve(gdb9_url_data, filename=gdb9_tar_data)
-    logging.info('GDB9 dataset downloaded successfully!')
+    gdb9_url_data = (
+    "https://raw.githubusercontent.com/"
+    "bondrewd/dataset-qm9-raw/main/dsgdb9nsd.xyz.tar.bz2"
+    )
+    gdb9_tar_data = join(gdb9dir, "dsgdb9nsd.xyz.tar.bz2")
+
+    # Reuse valid downloads; replace empty or invalid files.
+    if not tarfile.is_tarfile(gdb9_tar_data):
+        temporary_path = gdb9_tar_data + ".part"
+
+        print(f"Downloading QM9 from {gdb9_url_data}", flush=True)
+        urllib.request.urlretrieve(
+            gdb9_url_data, filename=temporary_path
+        )
+
+        if not tarfile.is_tarfile(temporary_path):
+            raise RuntimeError(
+                f"Downloaded file is not a valid tar archive: {temporary_path}"
+            )
+
+        os.replace(temporary_path, gdb9_tar_data)
+
+    print(f"Using QM9 archive: {gdb9_tar_data}", flush=True)
 
     # If splits are not specified, automatically generate them.
     if splits is None:
@@ -80,7 +96,7 @@ def gen_splits_gdb9(gdb9dir, cleanup=True):
     set.
     """
     logging.info('Splits were not specified! Automatically generating.')
-    gdb9_url_excluded = 'https://springernature.figshare.com/ndownloader/files/3195404'
+    gdb9_url_excluded = "https://ndownloader.figshare.com/files/3195404"
     gdb9_txt_excluded = join(gdb9dir, 'uncharacterized.txt')
     urllib.request.urlretrieve(gdb9_url_excluded, filename=gdb9_txt_excluded)
 
@@ -144,7 +160,10 @@ def get_thermo_dict(gdb9dir, cleanup=True):
     """
     # Download thermochemical energy
     logging.info('Downloading thermochemical energy.')
-    gdb9_url_thermo = 'https://springernature.figshare.com/ndownloader/files/3195395'
+    gdb9_url_thermo = (
+    "https://raw.githubusercontent.com/"
+    "bondrewd/dataset-qm9-raw/main/atomref.txt"
+)
     gdb9_txt_thermo = join(gdb9dir, 'atomref.txt')
 
     urllib.request.urlretrieve(gdb9_url_thermo, filename=gdb9_txt_thermo)
@@ -213,7 +232,7 @@ def get_unique_charges(charges):
     Get count of each charge for each molecule.
     """
     # Create a dictionary of charges
-    charge_counts = {z: np.zeros(len(charges), dtype=np.int)
+    charge_counts = {z: np.zeros(len(charges), dtype=int)
                      for z in np.unique(charges)}
     print(charge_counts.keys())
 

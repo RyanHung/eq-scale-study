@@ -34,7 +34,7 @@ def download_dataset_qm9(datadir, dataname, splits=None, calculate_thermo=True, 
     gdb9_tar_data = join(gdb9dir, "dsgdb9nsd.xyz.tar.bz2")
 
     # Reuse valid downloads; replace empty or invalid files.
-    if not tarfile.is_tarfile(gdb9_tar_data):
+    if not (os.path.exists(gdb9_tar_data) and tarfile.is_tarfile(gdb9_tar_data)):
         temporary_path = gdb9_tar_data + ".part"
 
         print(f"Downloading QM9 from {gdb9_url_data}", flush=True)
@@ -98,7 +98,7 @@ def gen_splits_gdb9(gdb9dir, cleanup=True):
     logging.info('Splits were not specified! Automatically generating.')
     gdb9_url_excluded = "https://ndownloader.figshare.com/files/3195404"
     gdb9_txt_excluded = join(gdb9dir, 'uncharacterized.txt')
-    urllib.request.urlretrieve(gdb9_url_excluded, filename=gdb9_txt_excluded)
+    if not os.path.exists(gdb9_txt_excluded): urllib.request.urlretrieve(gdb9_url_excluded, filename=gdb9_txt_excluded)
 
     # First get list of excluded indices
     excluded_strings = []
@@ -166,7 +166,7 @@ def get_thermo_dict(gdb9dir, cleanup=True):
 )
     gdb9_txt_thermo = join(gdb9dir, 'atomref.txt')
 
-    urllib.request.urlretrieve(gdb9_url_thermo, filename=gdb9_txt_thermo)
+    if not os.path.exists(gdb9_txt_thermo): urllib.request.urlretrieve(gdb9_url_thermo, filename=gdb9_txt_thermo)
 
     # Loop over file of thermochemical energies
     therm_targets = ['zpve', 'U0', 'U', 'H', 'G', 'Cv']

@@ -43,7 +43,7 @@ class E_GCL_mask(E_GCL):
 
 
 class EGNN(nn.Module):
-    def __init__(self, in_node_nf, in_edge_nf, hidden_nf, device='cpu', act_fn=nn.SiLU(), n_layers=4, coords_weight=1.0, attention=False, node_attr=1):
+    def __init__(self, in_node_nf, in_edge_nf, hidden_nf, device='cpu', act_fn=nn.SiLU(), n_layers=4, coords_weight=1.0, attention=False, node_attr=1, layer_cls=E_GCL_mask):
         super(EGNN, self).__init__()
         self.hidden_nf = hidden_nf
         self.device = device
@@ -57,7 +57,7 @@ class EGNN(nn.Module):
         else:
             n_node_attr = 0
         for i in range(0, n_layers):
-            self.add_module("gcl_%d" % i, E_GCL_mask(self.hidden_nf, self.hidden_nf, self.hidden_nf, edges_in_d=in_edge_nf, nodes_attr_dim=n_node_attr, act_fn=act_fn, recurrent=True, coords_weight=coords_weight, attention=attention))
+            self.add_module("gcl_%d" % i, layer_cls(self.hidden_nf, self.hidden_nf, self.hidden_nf, edges_in_d=in_edge_nf, nodes_attr_dim=n_node_attr, act_fn=act_fn, recurrent=True, coords_weight=coords_weight, attention=attention))
 
         self.node_dec = nn.Sequential(nn.Linear(self.hidden_nf, self.hidden_nf),
                                       act_fn,
@@ -86,3 +86,22 @@ class EGNN(nn.Module):
 
 
 
+
+
+class E_GCL_raw(E_GCL_mask):
+    """Same layer, but the edge MLP never sees the squared distance."""
+    def coord2radial(self, edge_index, coord):
+        radial, coord_diff = super().coord2radial(edge_index, coord)
+        return torch.zeros_like(radial), coord_diff
+
+
+class NonEquivGNN(EGNN):
+    """Same depth/width as EGNN, but orientation enters as raw coordinates and raw relative vectors."""
+    def __init__(self, in_node_nf, hidden_nf, **kw):
+        super().__init__(in_node_nf + 3, 3, hidden_nf, layer_cls=E_GCL_raw, **kw)
+
+    def forward(self, h0, x, edges, edge_attr, node_mask, edge_mask, n_nodes):
+        row, col = edges
+        edge_attr = x[row] - x[col]
+        h0 = torch.cat([h0, x], dim=1)
+        return super().forward(h0, x, edges, edge_attr, node_mask, edge_mask, n_nodes)
